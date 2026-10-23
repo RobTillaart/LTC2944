@@ -149,7 +149,8 @@ bool LTC2944::setControl( uint8_t ALCC,
     return false;
   }
   //  0..7 ==> 1..4096
-  _prescaler = {1, 4, 16, 64, 256, 1024, 4096, 4096 }[prescaler];
+  _prescaler = 1 << (prescaler * 2);
+  if (_prescaler > 4096) _prescaler = 4096;
   _QLSB = _calculateQLSB();
 
   uint8_t control = shutDown | (ALCC << 1) | (prescaler << 3) | (ADCMode << 6);
