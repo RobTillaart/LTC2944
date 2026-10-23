@@ -148,8 +148,8 @@ bool LTC2944::setControl( uint8_t ALCC,
     _error = LTC2944_CONTROL_ERROR;
     return false;
   }
-  //  0..7 ==> 1..128
-  _prescaler = 1 << prescaler;
+  //  0..7 ==> 1..4096
+  _prescaler = {1, 4, 16, 64, 256, 1024, 4096, 4096 }[prescaler];
   _QLSB = _calculateQLSB();
 
   uint8_t control = shutDown | (ALCC << 1) | (prescaler << 3) | (ADCMode << 6);
@@ -296,14 +296,14 @@ bool LTC2944::getVoltage(float &voltage)
 {
   uint8_t value[2] = {0, 0};
   _read(LTC2944_REG_VOLTS_MSB, value, 2);
-  voltage = ((value[0] << 8) + value[1]) * (23.6f / 65535.0f);
+  voltage = ((value[0] << 8) + value[1]) * (70.8f / 65535.0f);
   return (_error == LTC2944_OK);
 }
 
 bool LTC2944::setVoltageThresholdHigh(float th)
 {
   //  page 14
-  uint16_t raw = round(th * (65535.0f / 23.6f));
+  uint16_t raw = round(th * (65535.0f / 70.8f));
   uint8_t value[2];
   value[0] = raw >> 8;
   value[1] = raw & 0xFF;
@@ -316,13 +316,13 @@ bool LTC2944::getVoltageThresholdHigh(float &th)
   uint8_t value[2];
   _read(LTC2944_REG_VOLTS_TH_HIGH_MSB, value, 2);
   uint16_t raw = value[0] * 256 + value[1];
-  th = raw * (23.6f / 65535.0f);
+  th = raw * (70.8f / 65535.0f);
   return (_error == LTC2944_OK);
 }
 
 bool LTC2944::setVoltageThresholdLow(float th)
 {
-  uint16_t raw = round(th * (65535.0f / 23.6f));
+  uint16_t raw = round(th * (65535.0f / 70.8f));
   uint8_t value[2];
   value[0] = raw >> 8;
   value[1] = raw & 0xFF;
@@ -335,7 +335,7 @@ bool LTC2944::getVoltageThresholdLow(float &th)
   uint8_t value[2];
   _read(LTC2944_REG_VOLTS_TH_LOW_MSB, value, 2);
   uint16_t raw = value[0] * 256 + value[1];
-  th = raw * (23.6f / 65535.0f);
+  th = raw * (70.8f / 65535.0f);
   return (_error == LTC2944_OK);
 }
 
@@ -349,14 +349,14 @@ bool LTC2944::getCurrent(float &current)
   uint8_t value[2] = {0, 0};
   _read(LTC2944_REG_CURRENT_MSB, value, 2);  //  page 14
   int16_t Vsense = ((value[0] * 256) + value[1]) - 32767;
-  current = Vsense / _RSense * (0.060f / 32767.0f);
+  current = Vsense / _RSense * (0.064f / 32767.0f);
   return (_error == LTC2944_OK);
 }
 
 bool LTC2944::setCurrentThresholdHigh(float th)
 {
   //  page 15
-  uint16_t raw = round(th * ((32767 * 0.050) / 0.060)) + 32767;
+  uint16_t raw = round(th * ((32767 * 0.050f) / 0.064f)) + 32767;
   uint8_t value[2];
   value[0] = raw >> 8;
   value[1] = raw & 0xFF;
@@ -369,13 +369,13 @@ bool LTC2944::getCurrentThresholdHigh(float &th)
   uint8_t value[2];
   _read(LTC2944_REG_CURRENT_TH_HIGH_MSB, value, 2);
   int16_t raw = ((value[0] * 256) + value[1]) - 32767;
-  th = raw * (0.060 / (0.050 * 32767));
+  th = raw * (0.064f / (0.050f * 32767));
   return (_error == LTC2944_OK);
 }
 
 bool LTC2944::setCurrentThresholdLow(float th)
 {
-  uint16_t raw = round(th * (0.050 / 0.060 * 32767)) + 32767;  //  page 15
+  uint16_t raw = round(th * ((32767 * 0.050f) / 0.064f)) + 32767;  //  page 15
   uint8_t value[2];
   value[0] = raw >> 8;
   value[1] = raw & 0xFF;
@@ -388,7 +388,7 @@ bool LTC2944::getCurrentThresholdLow(float &th)
   uint8_t value[2];
   _read(LTC2944_REG_CURRENT_TH_LOW_MSB, value, 2);
   int16_t raw = ((value[0] * 256) + value[1]) - 32767;
-  th = raw * (0.060 / (0.050 * 32767));
+  th = raw * (0.064f / (0.050f * 32767));
   return (_error == LTC2944_OK);
 }
 
@@ -463,6 +463,7 @@ uint16_t LTC2944::getPrescaler()
 
 float LTC2944::getMaxCurrent()
 {
+  //  page 11
   return 0.050f / _RSense;
 }
 
@@ -473,7 +474,7 @@ float LTC2944::getMaxCurrent()
 //
 bool LTC2944::_setControl(uint8_t control)
 {
-  //  not allowed bit pattern. Page 9.
+  //  not allowed bit pattern. Page 10.
   if (control & 0x06)
   {
     _error = LTC2944_CONTROL_ERROR;
